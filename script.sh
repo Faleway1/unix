@@ -57,18 +57,32 @@ afficher_control() {
         "\n- Date: \(.srvTimeCrDateFrom) \n- Nom du Cours: \(.prgoOfferingDesc) \n- Description du Cours: \(.valDescription)"' "$type_agenda" 
 }
 
+format_heure() {
+  local heure="$1"
+  printf "%04d" "$heure"
+}
+
+calculer_duree() {
+  local debut="$1"
+  local fin="$2"
+  debut=$(format_heure "$debut")
+  fin=$(format_heure "$fin")
+  heure_debut=$((10#${debut:0:2} * 60 + 10#${debut:2:2}))
+  heure_fin=$((10#${fin:0:2} * 60 + 10#${fin:2:2}))
+  echo $(( (heure_fin - heure_debut) / 60 ))
+}
+
+
 
 afficher_heure_semaine() {
     local date_recherche="$1"
     local type_recherche="$2"
     local date_jour
-    local date_fin
     local type_agenda
     local total_heures=0
 
-
     if [ -z "$type_recherche" ]; then
-        echo "Veuillez spécifier si vous etes un eleve ou un prof."
+        echo -e "\e[31mErreur :\e[0m Veuillez spécifier si vous êtes un élève ou un prof."
         return 1
     else 
         if [[ "$type_recherche" == "prof" ]]; then
@@ -76,20 +90,51 @@ afficher_heure_semaine() {
         elif [[ "$type_recherche" == "eleve" ]]; then
             type_agenda="program_778.json"
         else
-            echo "Type de recherche inconnu : $type_recherche"
+            echo -e "\e[31mErreur :\e[0m Type de recherche inconnu : \e[1m$type_recherche\e[0m"
             return 1
         fi
     fi
 
-    for i in {0..6}; do 
-        date_jour=$(date -d "$date_debut + $i days" +%Y-%m-%d)
-        echo $date_jour
+    if [[ ! -f $type_agenda ]]; then
+        echo -e "\e[31mErreur :\e[0m Le fichier \e[1m$type_agenda\e[0m n'existe pas."
+        return 1
+    fi
 
-        jq -r --arg date "$date_recherche" '
-            .rows[] | 
-            select(.srvTimeCrDateFrom | contains($date)) | 
-            ' "$type_agenda"
+    dates_semaine=()
+    for i in {0..6}; do
+        dates_semaine+=("$(date -d "$date_recherche +$i days" +"%Y-%m-%d")")
     done
+
+    for date in "${dates_semaine[@]}"; do
+        echo -e "\nCours pour le $date :"
+
+        cours=$(jq -r --arg date "$date" '
+            .rows[]
+            | select(.srvTimeCrDateFrom | startswith($date))
+            | "\(.timeCrTimeFrom) \(.timeCrTimeTo) \(.valDescription)"
+        ' "$type_agenda")
+
+        if [[ -z "$cours" ]]; then
+            jour=$(date -d "$date" +%u)
+            if [[ "$jour" -eq 6 || "$jour" -eq 7 ]]; then
+                echo -e "C'est le weekend !!!"
+            else
+                echo -e "Jour chomage."
+            fi
+        else
+            while IFS=" " read -r debut fin desc; do
+                if [[ "$debut" =~ ^[0-9]+$ && "$fin" =~ ^[0-9]+$ ]]; then
+                    duree=$(calculer_duree "$debut" "$fin")
+                    total_heures=$((total_heures + duree))
+                    echo -e "  - $desc : $duree heures"
+                else
+                    echo -e "  - $desc : Heures invalides ($debut-$fin)"
+                fi
+            done <<< "$cours"
+        fi
+    done
+
+    echo -e "\nTotal des heures de cours pour la semaine : $total_heures heures"
 }
 
-affichage_cours_date 2024-10-01 prof VALOT, Mikael
+afficher_heure_semaine 2024-10-01 prof
