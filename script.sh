@@ -3,7 +3,9 @@
 affichage_cours_date() {
     local date_recherche="$1"
     local type_recherche="$2"
+    local nom="$3"
     local type_agenda
+    local date_jour="$date_recherche"
 
 
     if [ -z "$type_recherche" ]; then
@@ -20,11 +22,21 @@ affichage_cours_date() {
         fi
     fi
 
-    echo "Calendrier des événements de la date $date_recherche :"
-    jq -r --arg date "$date_recherche" '
-        .rows[] | 
-        select(.srvTimeCrDateFrom | contains($date)) | 
-        "\n- Date: \(.srvTimeCrDateFrom) \n- Nom du Cours: \(.prgoOfferingDesc) \n- Description du Cours: \(.valDescription)"' "$type_agenda" 
+    if [ -z "$nom" ]; then
+        echo "Veuillez fournir un nom et prenom (ex : NOM, Prenom)."
+        return 1
+    fi
+
+    for i in {0..6}; do
+        echo "Calendrier des événements de la date $date_jour :"
+
+        jq -r --arg date "$date_jour" --arg tchResName "$nom" '
+            .rows[] | 
+            select(.srvTimeCrDateFrom | contains($date)) | 
+            "\n- Date: \(.srvTimeCrDateFrom) \n- Nom du Cours: \(.prgoOfferingDesc) \n- Description du Cours: \(.valDescription)\n"' "$type_agenda" 
+
+        date_jour=$(date -d "$date_debut + $i days" +%Y-%m-%d)
+    done
 }
 
 
@@ -48,6 +60,7 @@ afficher_control() {
 
 afficher_heure_semaine() {
     local date_recherche="$1"
+    local type_recherche="$2"
     local date_jour
     local date_fin
     local type_agenda
@@ -55,7 +68,7 @@ afficher_heure_semaine() {
 
 
     if [ -z "$type_recherche" ]; then
-        echo "Veuillez fournir une date (ex. AAAA-MM-JJ)."
+        echo "Veuillez spécifier si vous etes un eleve ou un prof."
         return 1
     else 
         if [[ "$type_recherche" == "prof" ]]; then
@@ -71,6 +84,12 @@ afficher_heure_semaine() {
     for i in {0..6}; do 
         date_jour=$(date -d "$date_debut + $i days" +%Y-%m-%d)
         echo $date_jour
+
+        jq -r --arg date "$date_recherche" '
+            .rows[] | 
+            select(.srvTimeCrDateFrom | contains($date)) | 
+            ' "$type_agenda"
+    done
 }
 
-afficher_heure_semaine 2024-10-01
+affichage_cours_date 2024-10-01 prof VALOT, Mikael
