@@ -137,4 +137,30 @@ afficher_heure_semaine() {
     echo -e "\nTotal des heures de cours pour la semaine : $total_heures heures"
 }
 
-afficher_heure_semaine 2024-10-01 prof
+afficher_date_module() {
+    local FILE="teacher_3302.json"
+    local module="$1"
+
+    if [ -z "$module" ]; then
+        echo "Veuillez fournir un nom de module (ex. Algorithmique)."
+        return 1
+    fi
+
+    echo -e "Prochaines séances pour le module : $module "
+
+    jq -c '.rows[]' "$FILE" | while IFS= read -r row; do
+    module_name=$(echo "$row" | jq -r '.prgoOfferingDesc')
+    date=$(echo "$row" | jq -r '.srvTimeCrDateFrom')
+    from=$(echo "$row" | jq -r '.timeCrTimeFrom')
+    to=$(echo "$row" | jq -r '.timeCrTimeTo')
+    salle=$(echo "$row" | jq -r '.srvTimeCrDelRoom')
+
+    if [[ "$module_name" == "$module" ]]; then
+        heure_debut=$(printf "%04d" "$from" | sed 's/\(.\{2\}\)/\1h/')
+        heure_fin=$(printf "%04d" "$to" | sed 's/\(.\{2\}\)/\1h/')
+        echo -e "  - $date : $heure_debut à $heure_fin (Salle: $salle)"
+    fi
+    done
+}
+
+afficher_date_module Algorithmique
